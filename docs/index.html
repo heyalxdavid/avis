@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avis SEA Watch</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --card:#ffffff; --text:#1c1c1c; --muted:#6b6b6b;
+    --border:#e5e5e2; --green:#1a7f37; --green-bg:#e6f4ea;
+    --red:#b3261e; --red-bg:#fbe9e7; --amber:#8a5a00; --amber-bg:#fff4e0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141414; --card:#1f1f1f; --text:#f0f0ee; --muted:#a3a3a3;
+      --border:#333331; --green:#4ade80; --green-bg:#123322;
+      --red:#f87171; --red-bg:#3a1a17; --amber:#fbbf24; --amber-bg:#3a2c0a;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; justify-content:center; padding:32px 16px;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:28px; max-width:480px; width:100%;
+  }
+  h1{font-size:1.25rem; margin:0 0 4px;}
+  .sub{color:var(--muted); font-size:0.9rem; margin:0 0 20px;}
+  .badge{
+    display:inline-flex; align-items:center; gap:8px; padding:10px 16px;
+    border-radius:999px; font-weight:600; font-size:1rem; margin-bottom:20px;
+  }
+  .badge.available{background:var(--green-bg); color:var(--green);}
+  .badge.sold_out{background:var(--red-bg); color:var(--red);}
+  .badge.unknown, .badge.not_checked_yet, .badge.error{background:var(--amber-bg); color:var(--amber);}
+  dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:0.92rem;}
+  dt{color:var(--muted);}
+  dd{margin:0;}
+  a.cta{
+    display:inline-block; margin-top:20px; padding:10px 18px; border-radius:10px;
+    background:var(--text); color:var(--bg); text-decoration:none; font-weight:600;
+  }
+  .note{margin-top:16px; font-size:0.85rem; color:var(--muted);}
+  .refresh{font-size:0.75rem; color:var(--muted); margin-top:24px;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Avis · Seattle-Tacoma Airport</h1>
+    <p class="sub" id="dates">Loading…</p>
+    <div id="badge" class="badge unknown">Checking…</div>
+    <dl id="details"></dl>
+    <a class="cta" href="https://www.avis.com/en/home" target="_blank" rel="noopener">Open Avis.com</a>
+    <p class="note" id="note"></p>
+    <p class="refresh">Auto-refreshes every 60s · <span id="checkedAt"></span></p>
+  </div>
+
+<script>
+const LABELS = {
+  available: 'Available!',
+  sold_out: 'Sold out',
+  unknown: 'Unclear — check manually',
+  error: 'Check failed',
+  not_checked_yet: 'Not checked yet',
+};
+
+async function load() {
+  try {
+    const res = await fetch('status.json?_=' + Date.now(), { cache: 'no-store' });
+    const s = await res.json();
+
+    document.getElementById('dates').textContent =
+      `${s.pickupDate} ${s.pickupTime} → ${s.returnDate} ${s.returnTime}`;
+
+    const badge = document.getElementById('badge');
+    badge.className = 'badge ' + s.status;
+    badge.textContent = LABELS[s.status] || s.status;
+
+    document.getElementById('details').innerHTML = `
+      <dt>Vehicles seen</dt><dd>${s.vehicleCount ?? '—'}</dd>
+      <dt>Sample price</dt><dd>${s.cheapestPriceText ?? '—'}</dd>
+    `;
+
+    document.getElementById('note').textContent = s.note || '';
+    document.getElementById('checkedAt').textContent =
+      s.checkedAt ? 'last checked ' + new Date(s.checkedAt).toLocaleString() : '';
+  } catch (e) {
+    document.getElementById('note').textContent = 'Could not load status.json yet.';
+  }
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "avis-sea-watch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Checks Avis Seattle-Tacoma Airport (SEA) for rental car availability on a schedule and notifies when it opens up.",
+  "type": "commonjs",
+  "scripts": {
+    "check": "node check.js"
+  },
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
+}

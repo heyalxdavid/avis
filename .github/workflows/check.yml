@@ -1,0 +1,109 @@
+name: Check Avis SEA Availability
+
+on:
+  schedule:
+    # Every 20 minutes. GitHub may delay this by several minutes during
+    # busy periods — that's a GitHub Actions limitation, not a bug here.
+    - cron: '*/20 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: avis-sea-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PICKUP_LOCATION: ${{ vars.PICKUP_LOCATION || 'SEA' }}
+      PICKUP_LOCATION_LABEL: ${{ vars.PICKUP_LOCATION_LABEL || 'Seattle-Tacoma Airport' }}
+      PICKUP_DATE: ${{ vars.PICKUP_DATE || '2026-09-04' }}
+      PICKUP_TIME: ${{ vars.PICKUP_TIME || '4:00 PM' }}
+      RETURN_DATE: ${{ vars.RETURN_DATE || '2026-09-12' }}
+      RETURN_TIME: ${{ vars.RETURN_TIME || '4:00 PM' }}
+      NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run availability check
+        id: check
+        run: node check.js
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-${{ github.run_id }}
+          path: docs/debug/
+          retention-days: 3
+
+      - name: Write run summary
+        if: always()
+        run: |
+          echo "### Avis SEA watch result" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat docs/status.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify (ntfy.sh) when availability appears
+        if: steps.check.outputs.status == 'available' && steps.check.outputs.transitioned == 'true' && env.NTFY_TOPIC != ''
+        run: |
+          curl -s \
+            -H "Title: Avis SEA availability found!" \
+            -H "Priority: urgent" \
+            -H "Tags: rotating_light" \
+            -d "Avis at Seattle-Tacoma Airport now shows availability for ${PICKUP_DATE} ${PICKUP_TIME} to ${RETURN_DATE} ${RETURN_TIME}. Book it now." \
+            "https://ntfy.sh/${NTFY_TOPIC}"
+
+      - name: Open an issue when availability appears
+        if: steps.check.outputs.status == 'available' && steps.check.outputs.transitioned == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const status = JSON.parse(fs.readFileSync('docs/status.json', 'utf8'));
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Avis SEA availability found (${status.checkedAt})`,
+              body: [
+                `Status: **${status.status}**`,
+                `Vehicles detected: ${status.vehicleCount}`,
+                status.cheapestPriceText ? `Sample price text: ${status.cheapestPriceText}` : '',
+                '',
+                `Pickup: ${status.pickupDate} ${status.pickupTime} at ${status.locationLabel}`,
+                `Return: ${status.returnDate} ${status.returnTime}`,
+                '',
+                'Go book it before it sells out again: https://www.avis.com/en/home',
+              ].join('\n'),
+            });
+
+      - name: Commit updated status
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Avis SEA status [skip ci]"
+            git push
+          else
+            echo "No status change to commit."
+          fi

@@ -1,0 +1,16 @@
+{
+  "checkedAt": null,
+  "location": "SEA",
+  "locationLabel": "Seattle-Tacoma Airport",
+  "pickupDate": "2026-09-04",
+  "pickupTime": "4:00 PM",
+  "returnDate": "2026-09-12",
+  "returnTime": "4:00 PM",
+  "status": "not_checked_yet",
+  "vehicleCount": 0,
+  "cheapestPriceText": null,
+  "note": "Waiting for the first scheduled run, or trigger one manually from the Actions tab.",
+  "error": null,
+  "transitioned": false,
+  "log": []
+}

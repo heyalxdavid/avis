@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-04T14:51:28.495Z",
+  "checkedAt": "2026-09-04T15:06:33.035Z",
   "location": "SEA",
   "locationLabel": "Seattle-Tacoma Airport",
   "pickupDate": "2026-09-04",
@@ -13,10 +13,15 @@
   "error": null,
   "transitioned": false,
   "log": [
-    "Location field candidate failed: locator.click: Timeout 5000ms exceeded.\nCall log:\n  - waiting for getByLabel(/pick.?up location/i)\n    - locator resolved to <input value=\"\" id=\"_r_26_\" type=\"text\" role=\"combobox\" autocomplete=\"off\" spellcheck=\"false\" aria-invalid=\"false\" aria-expanded=\"false\" autocapitalize=\"none\" aria-autocomplete=\"list\" data-testid=\"pick-up-location-field-input\" aria-label=\"Enter pick-up location or delivery address\" placeholder=\"Enter pick-up location or delivery address\" class=\"MuiInputBase-input MuiFilledInput-input MuiInputBase-inputAdornedStart MuiAutocomplete-input MuiAutocomplete-inputFocused mui-1wq6bz0\"/>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div aria-hidden=\"true\" class=\"MuiBackdrop-root MuiBackdrop-invisible MuiModal-backdrop mui-1lbe2ow\"></div> from <div role=\"presentation\" data-testid=\"sign-in-dialog-container\" class=\"MuiPopover-root MuiModal-root mui-1oghqqc\">…</div> subtree intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div aria-hidden=\"true\" class=\"MuiBackdrop-root MuiBackdrop-invisible MuiModal-backdrop mui-1lbe2ow\"></div> from <div role=\"presentation\" data-testid=\"sign-in-dialog-container\" class=\"MuiPopover-root MuiModal-root mui-1oghqqc\">…</div> subtree intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    9 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div aria-hidden=\"true\" class=\"MuiBackdrop-root MuiBackdrop-invisible MuiModal-backdrop mui-1lbe2ow\"></div> from <div role=\"presentation\" data-testid=\"sign-in-dialog-container\" class=\"MuiPopover-root MuiModal-root mui-1oghqqc\">…</div> subtree intercepts pointer events\n    - retrying click action\n      - waiting 500ms\n",
-    "Location field candidate failed: locator.click: Timeout 5000ms exceeded.\nCall log:\n  - waiting for getByPlaceholder(/city, airport|pick.?up location/i)\n    - locator resolved to <input value=\"\" id=\"_r_26_\" type=\"text\" role=\"combobox\" autocomplete=\"off\" spellcheck=\"false\" aria-invalid=\"false\" aria-expanded=\"false\" autocapitalize=\"none\" aria-autocomplete=\"list\" data-testid=\"pick-up-location-field-input\" aria-label=\"Enter pick-up location or delivery address\" placeholder=\"Enter pick-up location or delivery address\" class=\"MuiInputBase-input MuiFilledInput-input MuiInputBase-inputAdornedStart MuiAutocomplete-input MuiAutocomplete-inputFocused mui-1wq6bz0\"/>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div aria-hidden=\"true\" class=\"MuiBackdrop-root MuiBackdrop-invisible MuiModal-backdrop mui-1lbe2ow\"></div> from <div role=\"presentation\" data-testid=\"sign-in-dialog-container\" class=\"MuiPopover-root MuiModal-root mui-1oghqqc\">…</div> subtree intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div aria-hidden=\"true\" class=\"MuiBackdrop-root MuiBackdrop-invisible MuiModal-backdrop mui-1lbe2ow\"></div> from <div role=\"presentation\" data-testid=\"sign-in-dialog-container\" class=\"MuiPopover-root MuiModal-root mui-1oghqqc\">…</div> subtree intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    9 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div aria-hidden=\"true\" class=\"MuiBackdrop-root MuiBackdrop-invisible MuiModal-backdrop mui-1lbe2ow\"></div> from <div role=\"presentation\" data-testid=\"sign-in-dialog-container\" class=\"MuiPopover-root MuiModal-root mui-1oghqqc\">…</div> subtree intercepts pointer events\n    - retrying click action\n      - waiting 500ms\n",
-    "Could not set pickup time to 4:00 PM (leaving default).",
-    "Could not set return time to 4:00 PM (leaving default).",
-    "Could not find the search/submit button."
+    "Dismissed sign-in dialog via close button.",
+    "Selected location from dropdown.",
+    "Dismissed a promo/overlay dialog via Escape.",
+    "Selected pick-up date 2026-09-04.",
+    "Selected return date 2026-09-12.",
+    "Set pickup time to 4:00 PM.",
+    "Dismissed a promo/overlay dialog via Escape.",
+    "Set return time to 4:00 PM.",
+    "Dismissed a promo/overlay dialog via Escape.",
+    "Clicked search/submit button."
   ]
 }

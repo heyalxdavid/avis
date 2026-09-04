@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-04T15:09:00.574Z",
+  "checkedAt": "2026-09-04T18:08:45.565Z",
   "location": "SEA",
   "locationLabel": "Seattle-Tacoma Airport",
   "pickupDate": "2026-09-04",
@@ -15,8 +15,9 @@
   "log": [
     "Dismissed sign-in dialog via close button.",
     "Selected location from dropdown.",
-    "Selected pick-up date 2026-09-04.",
-    "Selected return date 2026-09-12.",
+    "Could not find a calendar day cell for pick-up date 2026-09-04.",
+    "Could not find a calendar day cell for return date 2026-09-12.",
+    "Dismissed a promo/overlay dialog via Escape.",
     "Set pickup time to 4:00 PM.",
     "Dismissed a promo/overlay dialog via Escape.",
     "Set return time to 4:00 PM.",

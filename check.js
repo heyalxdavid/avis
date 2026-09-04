@@ -80,6 +80,120 @@ async function dismissCookieBanner(page) {
   return false;
 }
 
+// Avis shows a "Sign in to get your best rates" popover (a MUI Popover with
+// data-testid="sign-in-dialog-container") a few seconds after the homepage
+// loads, on a timer/poll (not immediately). Its backdrop covers the whole
+// viewport and intercepts clicks on the search form even though the dialog
+// itself is drawn in a corner, so it must be dismissed before (and defensively
+// re-checked while) filling the form.
+async function dismissSignInDialog(page, log) {
+  try {
+    const closeBtn = page
+      .locator('[data-testid="sign-in-dialog-container"] button[aria-label="close"]')
+      .first();
+    if (await closeBtn.isVisible({ timeout: 1500 })) {
+      await closeBtn.click({ timeout: 2000 });
+      await page.waitForTimeout(400);
+      log?.push('Dismissed sign-in dialog via close button.');
+      return true;
+    }
+  } catch {
+    // fall through to Escape fallback
+  }
+  try {
+    if (await page.locator('[data-testid="sign-in-dialog-container"]').count()) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      log?.push('Dismissed sign-in dialog via Escape.');
+      return true;
+    }
+  } catch {
+    // no dialog present, nothing to do
+  }
+  return false;
+}
+
+// Actively waits a few seconds for the timer-driven sign-in dialog to show up
+// (rather than only checking once) so we don't lose a race with it appearing
+// mid-form-fill, then dismisses it if/when it does.
+async function waitOutSignInDialog(page, log) {
+  const deadline = Date.now() + 6000;
+  while (Date.now() < deadline) {
+    if (await dismissSignInDialog(page, log)) return true;
+    await page.waitForTimeout(500);
+  }
+  return false;
+}
+
+// Avis also runs Bounce Exchange marketing campaigns (email-capture / "35%
+// off" modals, id="bx-campaign-*", role="dialog") that pop up on an
+// unpredictable timer/engagement trigger — sometimes immediately, sometimes
+// mid-interaction, sometimes not at all. Rather than one selector per
+// campaign, this closes whatever generic dialog is currently blocking via
+// common close patterns, then Escape as a last resort.
+async function dismissGenericOverlay(page, log) {
+  try {
+    const overlay = page.locator('[role="dialog"]:visible, [id^="bx-campaign-"]:visible').first();
+    if ((await overlay.count()) === 0) return false;
+
+    const closeCandidates = [
+      overlay.locator('button[aria-label="close" i], [aria-label="close" i]').first(),
+      overlay.getByText(/^(continue without|no thanks|skip|maybe later|not now|decline)/i).first(),
+      overlay.locator('[class*="close" i]').first(),
+    ];
+    for (const btn of closeCandidates) {
+      try {
+        if (await btn.isVisible({ timeout: 800 })) {
+          await btn.click({ timeout: 1500 });
+          await page.waitForTimeout(300);
+          log?.push('Dismissed a promo/overlay dialog.');
+          return true;
+        }
+      } catch {
+        // try next candidate
+      }
+    }
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(300);
+    const stillThere = await overlay.isVisible().catch(() => false);
+    if (!stillThere) {
+      log?.push('Dismissed a promo/overlay dialog via Escape.');
+      return true;
+    }
+  } catch {
+    // no overlay present, nothing to do
+  }
+  return false;
+}
+
+async function dismissAnyOverlay(page, log) {
+  const a = await dismissSignInDialog(page, log);
+  const b = await dismissGenericOverlay(page, log);
+  return a || b;
+}
+
+// Wraps a click with one retry: if an overlay (of any known kind) intercepts
+// the click, dismiss it and try once more before giving up.
+async function clickWithOverlayRetry(page, locator, log, description) {
+  try {
+    await locator.click({ timeout: 4000 });
+    return true;
+  } catch (e) {
+    const dismissed = await dismissAnyOverlay(page, log);
+    if (dismissed) {
+      try {
+        await locator.click({ timeout: 4000 });
+        return true;
+      } catch (e2) {
+        log.push(`${description} click failed after dismissing overlay: ${e2.message}`);
+        return false;
+      }
+    }
+    log.push(`${description} click failed: ${e.message}`);
+    return false;
+  }
+}
+
 async function trySetLocation(page, log) {
   const fieldCandidates = [
     () => page.getByLabel(/pick.?up location/i),
@@ -104,7 +218,7 @@ async function trySetLocation(page, log) {
       ];
       for (const opt of optionCandidates) {
         try {
-          if (await opt.isVisible({ timeout: 2000 })) {
+          if (await opt.isVisible({ timeout: 4000 })) {
             await opt.click({ timeout: 2000 });
             log.push('Selected location from dropdown.');
             return true;
@@ -113,7 +227,12 @@ async function trySetLocation(page, log) {
           // try next
         }
       }
-      // No dropdown matched; assume typed value is enough and move on.
+      // No dropdown option matched (or the click didn't land). Whatever
+      // happened, close the suggestions popper explicitly — if left open it
+      // sits on top of the page and silently blocks every later click (the
+      // date/time/submit buttons all report "intercepts pointer events").
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(300);
       log.push('Typed location, no dropdown option matched (continuing anyway).');
       return true;
     } catch (e) {
@@ -123,75 +242,117 @@ async function trySetLocation(page, log) {
   return false;
 }
 
-async function clickDayInOpenCalendar(page, dateStr, log) {
-  const { long, day } = fmtDateForSearch(dateStr);
-  const candidates = [
-    page.getByRole('button', { name: new RegExp(long.replace(',', ',?'), 'i') }).first(),
-    page.getByLabel(new RegExp(long.replace(',', ',?'), 'i')).first(),
-    page.locator(`[aria-label*="${long}" i]`).first(),
-    page.getByText(new RegExp(`^${day}$`)).first(),
-  ];
-  for (const el of candidates) {
-    try {
-      if (await el.isVisible({ timeout: 3000 })) {
-        await el.click({ timeout: 3000 });
-        log.push(`Clicked calendar day for ${long}.`);
+function ordinalSuffix(n) {
+  const j = n % 10;
+  const k = n % 100;
+  if (j === 1 && k !== 11) return 'st';
+  if (j === 2 && k !== 12) return 'nd';
+  if (j === 3 && k !== 13) return 'rd';
+  return 'th';
+}
+
+// The date picker (react-day-picker) gives each day button an accessible
+// name like "Today, Friday, September 4th, 2026" or, once picked,
+// "Saturday, September 12th, 2026, selected" — always with an ordinal
+// suffix on the day and a weekday prefix that varies, so match on the
+// stable middle portion only.
+function calendarDayRegex(dateStr) {
+  const { day, monthName, year } = fmtDateForSearch(dateStr);
+  const suffix = ordinalSuffix(parseInt(day, 10));
+  return new RegExp(`${monthName}\\s+${day}${suffix},\\s*${year}`, 'i');
+}
+
+async function isCalendarOpen(page) {
+  // "Go to the Next Month" is a stable, unambiguous marker that the
+  // react-day-picker calendar is currently rendered (unlike matching on a
+  // bare year number, which can coincidentally match unrelated page text).
+  return page
+    .getByRole('button', { name: /go to the next month/i })
+    .first()
+    .isVisible({ timeout: 1000 })
+    .catch(() => false);
+}
+
+// Selecting the pick-up location auto-opens a single shared range calendar
+// (pick-up day, then return day, in two clicks), but that happens
+// asynchronously — poll briefly rather than checking once, then fall back
+// to clicking the "Pick-up date" button to open it if it never appears.
+async function openDateCalendar(page, log) {
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    if (await isCalendarOpen(page)) return true;
+    await page.waitForTimeout(250);
+  }
+  try {
+    const opener = page.getByRole('button', { name: /pick.?up date/i }).first();
+    if ((await opener.count()) === 0) return false;
+    await opener.click({ timeout: 4000 });
+    await page.waitForTimeout(500);
+    return true;
+  } catch (e) {
+    log.push(`Could not open date calendar: ${e.message}`);
+    return false;
+  }
+}
+
+async function clickCalendarDay(page, dateStr, label, log) {
+  const re = calendarDayRegex(dateStr);
+  const btn = page.getByRole('button', { name: re }).first();
+  try {
+    if (!(await btn.isVisible({ timeout: 4000 }))) {
+      log.push(`Could not find a calendar day cell for ${label} date ${dateStr}.`);
+      return false;
+    }
+  } catch {
+    log.push(`Could not find a calendar day cell for ${label} date ${dateStr}.`);
+    return false;
+  }
+  const ok = await clickWithOverlayRetry(page, btn, log, `${label} date (${dateStr})`);
+  if (ok) log.push(`Selected ${label} date ${dateStr}.`);
+  return ok;
+}
+
+async function setDateRange(page, log) {
+  await openDateCalendar(page, log);
+  const pickupOk = await clickCalendarDay(page, CONFIG.pickupDate, 'pick-up', log);
+  const returnOk = await clickCalendarDay(page, CONFIG.returnDate, 'return', log);
+  return pickupOk && returnOk;
+}
+
+// Time fields are custom listboxes (not native <select>s), opened by
+// clicking an unlabeled combobox that displays the current time. The
+// pick-up location input is ALSO role="combobox", and comes first in DOM
+// order, so within getByRole('combobox') the indices are:
+// 0 = pick-up location, 1 = pick-up time, 2 = return time, 3+ = Driver's
+// Age/Residency/etc. Options render zero-padded ("04:00 PM"), so match
+// loosely against the configured value.
+function timeOptionRegex(timeText) {
+  const m = timeText.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (!m) return new RegExp(timeText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const [, h, mm, ap] = m;
+  return new RegExp(`^0?${h}:${mm}\\s*${ap}$`, 'i');
+}
+
+async function trySetTimeByIndex(page, index, timeText, log, fieldName) {
+  try {
+    const combo = page.getByRole('combobox').nth(index);
+    const opened = await clickWithOverlayRetry(page, combo, log, `${fieldName} time combobox`);
+    if (!opened) {
+      log.push(`Could not set ${fieldName} time to ${timeText} (leaving default).`);
+      return false;
+    }
+    await page.waitForTimeout(300);
+    const option = page.getByRole('option', { name: timeOptionRegex(timeText) }).first();
+    if (await option.isVisible({ timeout: 3000 })) {
+      const picked = await clickWithOverlayRetry(page, option, log, `${fieldName} time option`);
+      if (picked) {
+        log.push(`Set ${fieldName} time to ${timeText}.`);
         return true;
       }
-    } catch {
-      // try next
     }
-  }
-  log.push(`Could not find a calendar day cell for ${long}.`);
-  return false;
-}
-
-async function trySetDateField(page, labelRegex, dateStr, log, fieldName) {
-  const openers = [
-    () => page.getByLabel(labelRegex).first(),
-    () => page.getByPlaceholder(labelRegex).first(),
-    () => page.getByRole('button', { name: labelRegex }).first(),
-  ];
-  for (const getOpener of openers) {
-    try {
-      const opener = getOpener();
-      if (await opener.count() === 0) continue;
-      await opener.click({ timeout: 5000 });
-      await page.waitForTimeout(600);
-      const ok = await clickDayInOpenCalendar(page, dateStr, log);
-      if (ok) return true;
-    } catch (e) {
-      log.push(`${fieldName} date opener candidate failed: ${e.message}`);
-    }
-  }
-  return false;
-}
-
-async function trySetTime(page, labelRegex, timeText, log, fieldName) {
-  const selectCandidates = [
-    () => page.getByLabel(labelRegex).first(),
-    () => page.locator('select').filter({ hasText: /AM|PM/i }),
-  ];
-  const variants = [timeText, timeText.replace(' ', ''), timeText.toUpperCase(), timeText.toLowerCase()];
-  for (const getSel of selectCandidates) {
-    try {
-      const sel = getSel();
-      const count = await sel.count();
-      for (let i = 0; i < count; i++) {
-        const el = sel.nth(i);
-        for (const v of variants) {
-          try {
-            await el.selectOption({ label: v }, { timeout: 1500 });
-            log.push(`Set ${fieldName} time to ${v}.`);
-            return true;
-          } catch {
-            // try next variant/element
-          }
-        }
-      }
-    } catch (e) {
-      log.push(`${fieldName} time candidate failed: ${e.message}`);
-    }
+    await page.keyboard.press('Escape').catch(() => {});
+  } catch (e) {
+    log.push(`${fieldName} time selection failed: ${e.message}`);
   }
   log.push(`Could not set ${fieldName} time to ${timeText} (leaving default).`);
   return false;
@@ -200,14 +361,17 @@ async function trySetTime(page, labelRegex, timeText, log, fieldName) {
 async function clickShowVehicles(page, log) {
   const candidates = [
     page.getByRole('button', { name: /show vehicles/i }).first(),
+    page.getByRole('button', { name: /show cars/i }).first(),
     page.getByRole('button', { name: /search|find a car|continue/i }).first(),
   ];
   for (const el of candidates) {
     try {
       if (await el.isVisible({ timeout: 3000 })) {
-        await el.click({ timeout: 5000 });
-        log.push('Clicked search/submit button.');
-        return true;
+        const ok = await clickWithOverlayRetry(page, el, log, 'search/submit button');
+        if (ok) {
+          log.push('Clicked search/submit button.');
+          return true;
+        }
       }
     } catch {
       // try next
@@ -220,6 +384,21 @@ async function clickShowVehicles(page, log) {
 async function assessResults(page, log) {
   await page.waitForTimeout(4000); // let the SPA fetch + render results
   const bodyText = await page.locator('body').innerText().catch(() => '');
+
+  // Avis sometimes puts the search behind a bot-detection challenge
+  // ("Verification Required — Slide right to secure your access"). This
+  // script deliberately does not attempt to solve or bypass it (that's an
+  // explicit non-goal) — it just reports that it happened.
+  const botCheckPatterns = /verification required|slide (right )?to secure|prove you.?re (a )?human|are you a robot|complete (this|the) (quick )?security check/i;
+  if (botCheckPatterns.test(bodyText)) {
+    log.push('Hit a bot-detection / verification challenge; not attempting to solve it.');
+    return {
+      status: 'blocked',
+      vehicleCount: 0,
+      cheapestPriceText: null,
+      note: 'Avis showed a bot-detection challenge instead of results. This script does not attempt to solve CAPTCHAs — see docs/debug/latest.png.',
+    };
+  }
 
   const soldOutPatterns = /no vehicles (are )?available|sold out|no cars available|we('|’)re sorry|no availability/i;
   const pricePattern = /\$\s?\d+(\.\d{2})?\s*\/?\s*(day|total)?/gi;
@@ -269,12 +448,17 @@ async function main() {
     await page.goto(CONFIG.homeUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(2000);
     await dismissCookieBanner(page);
+    await waitOutSignInDialog(page, log);
 
+    await dismissAnyOverlay(page, log);
     await trySetLocation(page, log);
-    await trySetDateField(page, /pick.?up date/i, CONFIG.pickupDate, log, 'pickup');
-    await trySetTime(page, /pick.?up time/i, CONFIG.pickupTime, log, 'pickup');
-    await trySetDateField(page, /(drop.?off|return) date/i, CONFIG.returnDate, log, 'return');
-    await trySetTime(page, /(drop.?off|return) time/i, CONFIG.returnTime, log, 'return');
+    await dismissAnyOverlay(page, log);
+    await setDateRange(page, log);
+    await dismissAnyOverlay(page, log);
+    await trySetTimeByIndex(page, 1, CONFIG.pickupTime, log, 'pickup');
+    await dismissAnyOverlay(page, log);
+    await trySetTimeByIndex(page, 2, CONFIG.returnTime, log, 'return');
+    await dismissAnyOverlay(page, log);
 
     await page.screenshot({ path: path.join(DEBUG_DIR, 'before-search.png') }).catch(() => {});
 
@@ -310,7 +494,7 @@ async function main() {
     pickupTime: CONFIG.pickupTime,
     returnDate: CONFIG.returnDate,
     returnTime: CONFIG.returnTime,
-    status: result.status, // 'available' | 'sold_out' | 'unknown' | 'error'
+    status: result.status, // 'available' | 'sold_out' | 'unknown' | 'blocked' | 'error'
     vehicleCount: result.vehicleCount,
     cheapestPriceText: result.cheapestPriceText,
     note: result.note,

@@ -381,16 +381,34 @@ async function clickShowVehicles(page, log) {
   return false;
 }
 
+// Bot-check challenges (e.g. "Verification Required" / "Access is
+// temporarily restricted") render inside a cross-origin iframe, not the
+// main document, so body.innerText() on the top frame alone never sees
+// them — every frame has to be checked.
+async function getAllFramesText(page) {
+  const texts = [];
+  for (const frame of page.frames()) {
+    try {
+      texts.push(await frame.locator('body').innerText({ timeout: 1000 }));
+    } catch {
+      // frame not ready, detached, or has no body — skip it
+    }
+  }
+  return texts.join('\n');
+}
+
 async function assessResults(page, log) {
   await page.waitForTimeout(4000); // let the SPA fetch + render results
   const bodyText = await page.locator('body').innerText().catch(() => '');
 
   // Avis sometimes puts the search behind a bot-detection challenge
-  // ("Verification Required — Slide right to secure your access"). This
-  // script deliberately does not attempt to solve or bypass it (that's an
-  // explicit non-goal) — it just reports that it happened.
-  const botCheckPatterns = /verification required|slide (right )?to secure|prove you.?re (a )?human|are you a robot|complete (this|the) (quick )?security check/i;
-  if (botCheckPatterns.test(bodyText)) {
+  // ("Verification Required — Slide right to secure your access", or
+  // "Access is temporarily restricted"). This script deliberately does not
+  // attempt to solve or bypass it (that's an explicit non-goal) — it just
+  // reports that it happened.
+  const botCheckPatterns = /verification required|slide (right )?to secure|prove you.?re (a )?human|are you a robot|complete (this|the) (quick )?security check|access is temporarily restricted/i;
+  const allFramesText = await getAllFramesText(page);
+  if (botCheckPatterns.test(bodyText) || botCheckPatterns.test(allFramesText)) {
     log.push('Hit a bot-detection / verification challenge; not attempting to solve it.');
     return {
       status: 'blocked',

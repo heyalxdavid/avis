@@ -1,27 +1,27 @@
 {
-  "checkedAt": "2026-09-04T15:06:33.035Z",
+  "checkedAt": "2026-09-04T15:09:00.574Z",
   "location": "SEA",
   "locationLabel": "Seattle-Tacoma Airport",
   "pickupDate": "2026-09-04",
   "pickupTime": "4:00 PM",
   "returnDate": "2026-09-12",
   "returnTime": "4:00 PM",
-  "status": "unknown",
+  "status": "blocked",
   "vehicleCount": 0,
   "cheapestPriceText": null,
-  "note": "Neither a clear sold-out message nor price listings were found. See debug screenshot/HTML.",
+  "note": "Avis showed a bot-detection challenge instead of results. This script does not attempt to solve CAPTCHAs — see docs/debug/latest.png.",
   "error": null,
   "transitioned": false,
   "log": [
     "Dismissed sign-in dialog via close button.",
     "Selected location from dropdown.",
-    "Dismissed a promo/overlay dialog via Escape.",
     "Selected pick-up date 2026-09-04.",
     "Selected return date 2026-09-12.",
     "Set pickup time to 4:00 PM.",
     "Dismissed a promo/overlay dialog via Escape.",
     "Set return time to 4:00 PM.",
     "Dismissed a promo/overlay dialog via Escape.",
-    "Clicked search/submit button."
+    "Clicked search/submit button.",
+    "Hit a bot-detection / verification challenge; not attempting to solve it."
   ]
 }

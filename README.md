@@ -44,12 +44,18 @@ honest caveats:
    actions).
 4. **(Recommended) Set up a push notification.** This uses
    [ntfy.sh](https://ntfy.sh) — free, no account needed:
-   - Install the ntfy app (iOS/Android) or open https://ntfy.sh in a browser.
-   - Subscribe to topic: `avis-sea-watch-3a678452486a` (already wired into
-     the workflow default — change it to your own random string if you'd
-     rather not share a topic name with anyone).
-   - Optionally override it: repo Settings → Secrets and variables → Actions
-     → Variables tab → New repository variable → `NTFY_TOPIC` → your topic.
+   - The workflow only notifies if a repo variable is set: Settings →
+     Secrets and variables → Actions → Variables tab → `NTFY_TOPIC` → a
+     random topic string only you know (anyone who knows the exact topic
+     name can subscribe to it too, and — since Actions logs are public on a
+     public repo — the topic value is technically visible there to anyone
+     who goes looking, so don't reuse a topic you care about keeping
+     secret).
+   - Install the ntfy app (iOS/Android) or open https://ntfy.sh in a
+     browser and subscribe to that same topic.
+   - A GitHub issue is also opened automatically the moment status flips to
+     `available` (no setup needed) — turn on "Watch → All Activity" on this
+     repo (top right of the repo page) to get that as an email.
 5. **Kick off a manual run** to confirm it works: Actions tab → "Check Avis
    SEA Availability" → Run workflow. Check the run's summary and
    `docs/debug/latest.png` artifact.
